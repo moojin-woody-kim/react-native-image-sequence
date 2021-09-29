@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.RejectedExecutionException;
 
+import android.util.Log;
 
 public class RCTImageSequenceView extends ImageView {
     private Integer framesPerSecond = 24;
@@ -23,10 +24,10 @@ public class RCTImageSequenceView extends ImageView {
     private ArrayList<AsyncTask> activeTasks;
     private HashMap<Integer, Bitmap> bitmaps;
     private RCTResourceDrawableIdHelper resourceDrawableIdHelper;
+    private RCTImageSequenceListener finishEventListener;
 
     public RCTImageSequenceView(Context context) {
         super(context);
-
         resourceDrawableIdHelper = new RCTResourceDrawableIdHelper();
     }
 
@@ -36,6 +37,7 @@ public class RCTImageSequenceView extends ImageView {
         private final Context context;
 
         public DownloadImageTask(Integer index, String uri, Context context) {
+            Log.i("ReactNativeImageSequence", "DownloadImageTask");
             this.index = index;
             this.uri = uri;
             this.context = context;
@@ -43,19 +45,27 @@ public class RCTImageSequenceView extends ImageView {
 
         @Override
         protected Bitmap doInBackground(String... params) {
+            Log.i("ReactNativeImageSequence", "doInBackground");
             if (this.uri.startsWith("http")) {
                 return this.loadBitmapByExternalURL(this.uri);
             }
-
-            return this.loadBitmapByLocalResource(this.uri);
+            
+            return this.loadBitmapByLocalFile(this.uri);
+            // return this.loadBitmapByLocalResource(this.uri);
         }
 
-
         private Bitmap loadBitmapByLocalResource(String uri) {
+            Log.i("ReactNativeImageSequence", "loadBitmapByLocalResource");
             return BitmapFactory.decodeResource(this.context.getResources(), resourceDrawableIdHelper.getResourceDrawableId(this.context, uri));
         }
 
+        private Bitmap loadBitmapByLocalFile(String uri) {
+            Log.i("ReactNativeImageSequence", "loadBitmapByLocalFile");
+            return BitmapFactory.decodeFile(uri);
+        }
+
         private Bitmap loadBitmapByExternalURL(String uri) {
+            Log.i("ReactNativeImageSequence", "loadBitmapByExternalURL");
             Bitmap bitmap = null;
 
             try {
@@ -70,6 +80,7 @@ public class RCTImageSequenceView extends ImageView {
 
         @Override
         protected void onPostExecute(Bitmap bitmap) {
+            Log.i("ReactNativeImageSequence", "onPostExecute");
             if (!isCancelled()) {
                 onTaskCompleted(this, index, bitmap);
             }
@@ -77,6 +88,7 @@ public class RCTImageSequenceView extends ImageView {
     }
 
     private void onTaskCompleted(DownloadImageTask downloadImageTask, Integer index, Bitmap bitmap) {
+        Log.i("ReactNativeImageSequence", "onTaskCompleted");
         if (index == 0) {
             // first image should be displayed as soon as possible.
             this.setImageBitmap(bitmap);
@@ -91,6 +103,7 @@ public class RCTImageSequenceView extends ImageView {
     }
 
     public void setImages(ArrayList<String> uris) {
+        Log.i("ReactNativeImageSequence", "setImages");
         if (isLoading()) {
             // cancel ongoing tasks (if still loading previous images)
             for (int index = 0; index < activeTasks.size(); index++) {
@@ -115,6 +128,7 @@ public class RCTImageSequenceView extends ImageView {
     }
 
     public void setFramesPerSecond(Integer framesPerSecond) {
+        Log.i("ReactNativeImageSequence", "setFramesPerSecond");
         this.framesPerSecond = framesPerSecond;
 
         // updating frames per second, results in building a new AnimationDrawable (because we cant alter frame duration)
@@ -124,12 +138,18 @@ public class RCTImageSequenceView extends ImageView {
     }
 
     public void setLoop(Boolean loop) {
+        Log.i("ReactNativeImageSequence", "setLoop");
         this.loop = loop;
 
         // updating looping, results in building a new AnimationDrawable
         if (isLoaded()) {
             setupAnimationDrawable();
         }
+    }
+
+    public void addFinishEventListener(RCTImageSequenceListener finishEventListener) {
+        Log.i("================","addFinishEventListener");
+        this.finishEventListener = finishEventListener;
     }
 
     private boolean isLoaded() {
@@ -141,15 +161,21 @@ public class RCTImageSequenceView extends ImageView {
     }
 
     private void setupAnimationDrawable() {
-        AnimationDrawable animationDrawable = new AnimationDrawable();
+        Log.i("ReactNativeImageSequence", "setupAnimationDrawable");
+        RCTImageSequenceAnimationDrawable animationDrawable = new RCTImageSequenceAnimationDrawable();
         for (int index = 0; index < bitmaps.size(); index++) {
             BitmapDrawable drawable = new BitmapDrawable(this.getResources(), bitmaps.get(index));
             animationDrawable.addFrame(drawable, 1000 / framesPerSecond);
         }
-
+        animationDrawable.setAnimationFinishListener(this.finishEventListener);
         animationDrawable.setOneShot(!this.loop);
 
         this.setImageDrawable(animationDrawable);
         animationDrawable.start();
     }
+
+    
 }
+
+
+

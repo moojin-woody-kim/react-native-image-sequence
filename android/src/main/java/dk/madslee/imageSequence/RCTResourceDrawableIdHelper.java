@@ -8,7 +8,8 @@ import com.facebook.common.util.UriUtil;
 import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
-
+//
+import android.util.Log;
 
 public class RCTResourceDrawableIdHelper {
 
